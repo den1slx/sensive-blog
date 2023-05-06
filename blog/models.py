@@ -21,6 +21,11 @@ class TagQuerySet(models.QuerySet):
         return self.annotate(Count('posts'))
 
 
+class CommentsQuerySet(models.QuerySet):
+    def post_comments(self, post):
+        return self.filter(post=post).count()
+
+
 class Post(models.Model):
     title = models.CharField('Заголовок', max_length=200)
     text = models.TextField('Текст')
@@ -101,3 +106,5 @@ class Comment(models.Model):
         ordering = ['published_at']
         verbose_name = 'комментарий'
         verbose_name_plural = 'комментарии'
+
+    objects = CommentsQuerySet.as_manager()
