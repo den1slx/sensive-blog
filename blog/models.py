@@ -10,7 +10,26 @@ class PostQuerySet(models.QuerySet):
         return self.filter(published_at__year=year).order_by('published_at')
 
     def popular(self):
-        return self.annotate(Count('likes')).order_by('-likes__count')
+        return self.annotate(Count('likes', distinct=True)).order_by('-likes__count')
+
+    def fetch_with_comments_id_and_count(self):
+        '''
+        Dict {post.id: post.comments.count()}
+        :return:
+        '''
+        posts = self.annotate(Count('comments'))
+        comments_count = dict([(post.id, post.comments__count) for post in posts])
+        return comments_count
+
+    def fetch_with_comments_count(self):
+        '''
+        list comments.count() for post in posts
+        :return:
+        '''
+        # posts = self.annotate(Count('comments', distinct=True))
+        # comments_count = [post.comments__count for post in posts]
+        comments_count = [post.comments.count() for post in self]
+        return comments_count
 
 
 class TagQuerySet(models.QuerySet):
@@ -19,6 +38,9 @@ class TagQuerySet(models.QuerySet):
 
     def posts_count(self):
         return self.annotate(Count('posts'))
+
+    def fetch_with_posts_count(self):
+        return [tag.posts.count() for tag in self]
 
 
 class CommentsQuerySet(models.QuerySet):
