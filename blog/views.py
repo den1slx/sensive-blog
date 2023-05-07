@@ -8,14 +8,6 @@ def add_template_field(queryset, counts):
         post.comments_count = counts[i]
 
 
-def get_related_posts_count(tag):
-    return tag.posts__count
-
-
-def get_likes_count(post):
-    return post.likes__count
-
-
 def serialize_post(post):
     return {
         'title': post.title,
@@ -45,35 +37,7 @@ def serialized_comment(comment):
     }
 
 
-def serialize_post_optimized(post, comments, post_count_tags=None):
-    if type(comments) == dict:
-        comments_count = comments[post.id]
-    elif type(comments) == int:
-        comments_count = comments
-    else:
-        comments_count = comments.post_comments(post)
-
-    if type(post_count_tags) == list:
-        count_tags = post_count_tags
-        tags = post.tags.all()
-    else:
-        tags = post.tags.all().prefetch_related('posts')
-        count_tags = tags.fetch_with_posts_count()
-
-    return {
-        'title': post.title,
-        'teaser_text': post.text[:200],
-        'author': post.author.username,
-        'comments_amount': comments_count,
-        'image_url': post.image.url if post.image else None,
-        'published_at': post.published_at,
-        'slug': post.slug,
-        'tags': [serialize_tag_optimized(tag, count_tags[i]) for (i, tag) in enumerate(tags)],
-        'first_tag_title': tags[0].title,
-    }
-
-
-def serialize_post_new(post):
+def serialize_post_optimized(post):
     tags = post.tags.all()
     return {
         'title': post.title,
@@ -83,26 +47,15 @@ def serialize_post_new(post):
         'image_url': post.image.url if post.image else None,
         'published_at': post.published_at,
         'slug': post.slug,
-        'tags': [serialize_tag_new(tag) for tag in tags.fetch_with_posts_count_new()],
+        'tags': [serialize_tag_optimized(tag) for tag in tags.fetch_with_posts_count_new()],
         'first_tag_title': tags.first().title,
     }
 
 
-def serialize_tag_new(tag):
+def serialize_tag_optimized(tag):
     return {
         'title': tag.title,
         'posts_with_tag': tag.posts_count,
-    }
-
-
-def serialize_tag_optimized(tag, count=None):
-    if type(count) == int:
-        tag_count = count
-    else:
-        tag_count = tag.posts__count
-    return {
-        'title': tag.title,
-        'posts_with_tag': tag_count,
     }
 
 
@@ -124,10 +77,10 @@ def index(request):
 
     context = {
         'most_popular_posts': [
-            serialize_post_new(post) for post in most_popular_posts
+            serialize_post_optimized(post) for post in most_popular_posts
         ],
-        'page_posts': [serialize_post_new(post) for post in most_fresh_posts],
-        'popular_tags': [serialize_tag_new(tag) for tag in most_popular_tags],
+        'page_posts': [serialize_post_optimized(post) for post in most_fresh_posts],
+        'popular_tags': [serialize_tag_optimized(tag) for tag in most_popular_tags],
     }
     return render(request, 'index.html', context)
 
@@ -155,7 +108,7 @@ def post_detail(request, slug):
         'image_url': post.image.url if post.image else None,
         'published_at': post.published_at,
         'slug': post.slug,
-        'tags': [serialize_tag_new(tag) for tag in related_tags],
+        'tags': [serialize_tag_optimized(tag) for tag in related_tags],
     }
 
     most_popular_tags = tags.popular()[:5].prefetch_related('posts').fetch_with_posts_count_new()
@@ -166,9 +119,9 @@ def post_detail(request, slug):
 
     context = {
         'post': serialized_post,
-        'popular_tags': [serialize_tag_new(tag) for tag in most_popular_tags],
+        'popular_tags': [serialize_tag_optimized(tag) for tag in most_popular_tags],
         'most_popular_posts': [
-            serialize_post_new(post) for post in most_popular_posts
+            serialize_post_optimized(post) for post in most_popular_posts
         ],
     }
     return render(request, 'post-details.html', context)
@@ -191,10 +144,10 @@ def tag_filter(request, tag_title):
 
     context = {
         'tag': tag.title,
-        'popular_tags': [serialize_tag_new(tag) for tag in most_popular_tags],
-        'posts': [serialize_post_new(post) for post in related_posts],
+        'popular_tags': [serialize_tag_optimized(tag) for tag in most_popular_tags],
+        'posts': [serialize_post_optimized(post) for post in related_posts],
         'most_popular_posts': [
-            serialize_post_new(post) for post in most_popular_posts
+            serialize_post_optimized(post) for post in most_popular_posts
         ],
     }
     return render(request, 'posts-list.html', context)
