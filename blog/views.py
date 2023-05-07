@@ -1,9 +1,10 @@
 from django.shortcuts import render
 from blog.models import Comment, Post, Tag
-from django.db.models import Count
+from django.db.models import Prefetch, Count
 
 
 def add_template_field(queryset, counts):
+    # similar queries ?
     for i, post in enumerate(queryset):
         post.comments_count = counts[i]
 
@@ -39,6 +40,8 @@ def serialized_comment(comment):
 
 def serialize_post_optimized(post):
     tags = post.tags.all()
+
+
     return {
         'title': post.title,
         'teaser_text': post.text[:200],
@@ -47,22 +50,29 @@ def serialize_post_optimized(post):
         'image_url': post.image.url if post.image else None,
         'published_at': post.published_at,
         'slug': post.slug,
-        'tags': [serialize_tag_optimized(tag) for tag in tags.fetch_with_posts_count_new()],
+        'tags': [],  # [serialize_tag_optimized(tag) for tag in tags.fetch_with_posts_count_new()],  # similar queries
         'first_tag_title': tags.first().title,
     }
 
 
 def serialize_tag_optimized(tag):
+    posts = tag.posts_attr
+    count = len(posts)
+
+    # count = tag.posts_count
     return {
         'title': tag.title,
-        'posts_with_tag': tag.posts_count,
+        'posts_with_tag': count,
     }
 
 
 def index(request):
     all_posts = Post.objects.all()
-    tags = Tag.objects.all().posts_count()
-
+    # tags = Tag.objects.all().posts_count()
+    pref_tags = (Tag.objects.all().prefetch_related(
+        Prefetch('posts', queryset=Post.objects.all(), to_attr='posts_attr')
+    ).annotate(posts_count_new=Count('posts')))
+    # indexes = list(pref_tags)
     most_popular_posts = all_posts.popular()[:5]\
         .prefetch_related('tags', 'comments', 'author')
     popular_counts = most_popular_posts.fetch_with_comments_count()
@@ -71,9 +81,11 @@ def index(request):
     most_fresh_posts = all_posts.order_by('-published_at')[:5]\
         .prefetch_related('tags', 'comments', 'author')
     fresh_counts = most_popular_posts.fetch_with_comments_count()
+
     add_template_field(most_fresh_posts, fresh_counts)
 
-    most_popular_tags = tags.popular()[:5].fetch_with_posts_count_new()
+    most_popular_tags = pref_tags.popular()[:5].fetch_with_posts_count_new()
+
 
     context = {
         'most_popular_posts': [
