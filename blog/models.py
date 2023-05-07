@@ -26,8 +26,6 @@ class PostQuerySet(models.QuerySet):
         list comments.count() for post in posts
         :return:
         '''
-        # posts = self.annotate(Count('comments', distinct=True))
-        # comments_count = [post.comments__count for post in posts]
         comments_count = [post.comments.count() for post in self]
         return comments_count
 
@@ -41,6 +39,15 @@ class TagQuerySet(models.QuerySet):
 
     def fetch_with_posts_count(self):
         return [tag.posts.count() for tag in self]
+
+    def fetch_with_posts_count_new(self):
+        '''
+        Only if not others have 'Count'
+        Add comments_count, 'self' not changed
+        :return:
+        '''
+        posts = self
+        return posts.annotate(posts_count=Count('posts'))
 
 
 class CommentsQuerySet(models.QuerySet):
