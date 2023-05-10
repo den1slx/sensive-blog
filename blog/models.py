@@ -12,6 +12,9 @@ class PostQuerySet(models.QuerySet):
     def popular(self):
         return self.annotate(Count('likes', distinct=True)).order_by('-likes__count')
 
+    def fetch_likes_count(self):
+        return self.annotate(Count('likes'))
+
     def fetch_with_comments_id_and_count(self):
         '''
         Dict {post.id: post.comments.count()}
@@ -24,7 +27,7 @@ class PostQuerySet(models.QuerySet):
     def fetch_with_comments_count(self):
         '''
         list comments.count() for post in posts
-        :return:
+        :return: list of int
         '''
         comments_count = [post.comments.count() for post in self]
         return comments_count
@@ -34,25 +37,23 @@ class TagQuerySet(models.QuerySet):
     def popular(self):
         return self.annotate(Count('posts')).order_by('-posts__count')
 
-    def posts_count(self):
-        return self.annotate(Count('posts'))
+    def fetch_with_posts_count(self, changed=False):
+        """
+        Add comments_count
+        :param changed: if True changed base QuerySet, else 'self' not changed
+        :return: QuerySet
+        """
 
-    def fetch_with_posts_count(self):
-        return [tag.posts.count() for tag in self]
+        if changed:
+            return self.annotate(posts_count=Count('posts'))
 
-    def fetch_with_posts_count_new(self):
-        '''
-        Only if not others have 'Count'
-        Add comments_count, 'self' not changed
-        :return:
-        '''
-        posts = self
-        return posts.annotate(posts_count=Count('posts'))
+        model = self
+        return model.annotate(posts_count=Count('posts'))
 
 
 class CommentsQuerySet(models.QuerySet):
-    def post_comments(self, post):
-        return self.filter(post=post).count()
+    def do_nothing(self):
+        return 'Im so lazy'  # delete it !
 
 
 class Post(models.Model):
