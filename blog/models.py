@@ -1,6 +1,6 @@
 from django.db import models
 from django.urls import reverse
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 from django.contrib.auth.models import User
 
 
@@ -24,13 +24,28 @@ class PostQuerySet(models.QuerySet):
         comments_count = dict([(post.id, post.comments__count) for post in posts])
         return comments_count
 
-    def fetch_with_comments_count(self):
+    def fetch_with_comments_count_old(self):
         '''
         list comments.count() for post in posts
         :return: list of int
         '''
         comments_count = [post.comments.count() for post in self]
         return comments_count
+
+    def fetch_with_comments_count(self):
+        posts = self
+        comments_count = [post.comments.count() for post in posts]
+        for i, post in enumerate(posts):
+            post.comments_count = comments_count[i]
+
+        return posts
+
+    def prefetch_tags(self, to_attr='tags_'):
+        return self.prefetch_related(Prefetch(
+            'tags',
+            queryset=Tag.objects.all().fetch_with_posts_count(),
+            to_attr=to_attr
+        ))
 
 
 class TagQuerySet(models.QuerySet):
@@ -49,11 +64,6 @@ class TagQuerySet(models.QuerySet):
 
         model = self
         return model.annotate(posts_count=Count('posts'))
-
-
-class CommentsQuerySet(models.QuerySet):
-    def do_nothing(self):
-        return 'Im so lazy'  # delete it !
 
 
 class Post(models.Model):
@@ -84,12 +94,12 @@ class Post(models.Model):
     def get_absolute_url(self):
         return reverse('post_detail', args={'slug': self.slug})
 
+    objects = PostQuerySet.as_manager()
+
     class Meta:
         ordering = ['-published_at']
         verbose_name = 'пост'
         verbose_name_plural = 'посты'
-
-    objects = PostQuerySet.as_manager()
 
 
 class Tag(models.Model):
@@ -104,12 +114,12 @@ class Tag(models.Model):
     def get_absolute_url(self):
         return reverse('tag_filter', args={'tag_title': self.slug})
 
+    objects = TagQuerySet.as_manager()
+
     class Meta:
         ordering = ['title']
         verbose_name = 'тег'
         verbose_name_plural = 'теги'
-
-    objects = TagQuerySet.as_manager()
 
 
 class Comment(models.Model):
@@ -136,5 +146,3 @@ class Comment(models.Model):
         ordering = ['published_at']
         verbose_name = 'комментарий'
         verbose_name_plural = 'комментарии'
-
-    objects = CommentsQuerySet.as_manager()
